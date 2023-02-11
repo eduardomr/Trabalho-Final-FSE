@@ -182,25 +182,9 @@ void app_main(void)
 
     xTaskCreate(&conectadoWifi,  "Conexão ao MQTT", 4096, NULL, 1, NULL);
     xTaskCreate(&trataComunicacaoComServidor, "Comunicação com Broker", 4096, NULL, 1, NULL);
-
-
-
-    char mensagem[50];
+    
     while (true)
     {
-        float temperature_read = DHT11_read().temperature;
-        float humidity_read = DHT11_read().humidity;
-
-        if (temperature_read != -1 && humidity_read != -1)
-        {
-            temperatura = temperature_read;
-            umidade = humidity_read;
-        }
-
-        printf("Temperatura: %.2f\n", temperatura);
-        printf("Umidade: %.2f\n", umidade);
-
-
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
+        dht11_run()
     }
 }

@@ -43,7 +43,7 @@ float umidade = 0.0;
 float temperatura_media = 0.0;
 float umidade_media = 0.0;
 
-extern void mqtt_envia_mensagem(char *topico, char *mensagem);
+extern void mqtt_send_message(char *topic, char *menssage);
 
 static int _waitOrTimeout(uint16_t microSeconds, int level)
 {
@@ -102,7 +102,6 @@ static struct dht11_reading _crcError()
 
 struct dht11_reading DHT11_read()
 {
-    /* Tried to sense too son since last read (dht11 needs ~2 seconds to make a new read) */
     if (esp_timer_get_time() - 2000000 < last_read_time)
     {
         return last_read;
@@ -117,16 +116,15 @@ struct dht11_reading DHT11_read()
     if (_checkResponse() == DHT11_TIMEOUT_ERROR)
         return last_read = _timeoutError();
 
-    /* Read response */
     for (int i = 0; i < 40; i++)
     {
-        /* Initial data */
+        
         if (_waitOrTimeout(50, 0) == DHT11_TIMEOUT_ERROR)
             return last_read = _timeoutError();
 
         if (_waitOrTimeout(70, 1) > 28)
         {
-            /* Bit received was a 1 */
+            
             data[i / 8] |= (1 << (7 - (i % 8)));
         }
     }
@@ -144,7 +142,14 @@ struct dht11_reading DHT11_read()
     }
 }
 
-void app_main()
+int dht_11_get_umidade(){
+    return umidade;
+}
+
+int dht_11_get_temperatura(){
+    return temperatura;
+}
+void dht11_run()
 {
     char mensagem[50];
     while (true)
