@@ -1,15 +1,26 @@
-#include <stdio.h>
-#include <string.h>
-#include "nvs_flash.h"
-#include "esp_wifi.h"
-#include "esp_event.h"
-#include "esp_http_client.h"
-#include "esp_log.h"
-#include "freertos/semphr.h"
-#include "dht11.h"
-
-#include "wifi.h"
-#include "mqtt.h"
+/*
+ * MIT License
+ *
+ * Copyright (c) 2018 Michele Biondi
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
 
 #include "esp_timer.h"
 #include "driver/gpio.h"
@@ -22,7 +33,6 @@
 
 #include "nvs_handler.h"
 
-//temperature function start
 static gpio_num_t dht_gpio = GPIO_NUM_4;
 static int64_t last_read_time = -2000000;
 static struct dht11_reading last_read;
@@ -30,7 +40,10 @@ static struct dht11_reading last_read;
 float temperatura = 0.0;
 float umidade = 0.0;
 
-extern void mqtt_send_message(char *topic, char *menssage);
+float temperatura_media = 0.0;
+float umidade_media = 0.0;
+
+extern void mqtt_envia_mensagem(char *topico, char *mensagem);
 
 static int _waitOrTimeout(uint16_t microSeconds, int level)
 {
@@ -64,11 +77,11 @@ static void _sendStartSignal()
 
 static int _checkResponse()
 {
-
+    /* Wait for next step ~80us*/
     if (_waitOrTimeout(80, 0) == DHT11_TIMEOUT_ERROR)
         return DHT11_TIMEOUT_ERROR;
 
-    
+    /* Wait for next step ~80us*/
     if (_waitOrTimeout(80, 1) == DHT11_TIMEOUT_ERROR)
         return DHT11_TIMEOUT_ERROR;
 
@@ -89,6 +102,7 @@ static struct dht11_reading _crcError()
 
 struct dht11_reading DHT11_read()
 {
+    /* Tried to sense too son since last read (dht11 needs ~2 seconds to make a new read) */
     if (esp_timer_get_time() - 2000000 < last_read_time)
     {
         return last_read;
@@ -103,15 +117,16 @@ struct dht11_reading DHT11_read()
     if (_checkResponse() == DHT11_TIMEOUT_ERROR)
         return last_read = _timeoutError();
 
+    /* Read response */
     for (int i = 0; i < 40; i++)
     {
-        
+        /* Initial data */
         if (_waitOrTimeout(50, 0) == DHT11_TIMEOUT_ERROR)
             return last_read = _timeoutError();
 
         if (_waitOrTimeout(70, 1) > 28)
         {
-            
+            /* Bit received was a 1 */
             data[i / 8] |= (1 << (7 - (i % 8)));
         }
     }
@@ -128,78 +143,31 @@ struct dht11_reading DHT11_read()
         return last_read = _crcError();
     }
 }
-//end of temperature function
 
-SemaphoreHandle_t conexaoWifiSemaphore;
-SemaphoreHandle_t conexaoMQTTSemaphore;
-
-void conectadoWifi(void * params)
+void app_main()
 {
-  while(true)
-  {
-    if(xSemaphoreTake(conexaoWifiSemaphore, portMAX_DELAY))
-    {
-      // Processamento Internet
-      mqtt_start();
-    }
-  }
-}
-
-void trataComunicacaoComServidor(void * params)
-{
-  char mensagem[50];
-  char JsonAtributos[200];
-  if(xSemaphoreTake(conexaoMQTTSemaphore, portMAX_DELAY))
-  {
-    while(true)
-    {
-       float temperatura = 20.0 + (float)rand()/(float)(RAND_MAX/10.0);
-       sprintf(mensagem, "{\"temperatura\": %f}", temperatura);
-       mqtt_envia_mensagem("v1/devices/me/telemetry", mensagem);
-
-       sprintf(JsonAtributos, "{\"quantidade de pinos\": 5,\n\"umidade\":  20}");
-       mqtt_envia_mensagem("v1/devices/me/telemetry", JsonAtributos);
-       vTaskDelay(3000 / portTICK_PERIOD_MS);
-    }
-  }
-}
-
-
-
-void app_main(void)
-{
-    // Inicializa o NVS
-    esp_err_t ret = nvs_flash_init();
-    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-      ESP_ERROR_CHECK(nvs_flash_erase());
-      ret = nvs_flash_init();
-    }
-    ESP_ERROR_CHECK(ret);
-    
-    conexaoWifiSemaphore = xSemaphoreCreateBinary();
-    conexaoMQTTSemaphore = xSemaphoreCreateBinary();
-    wifi_start();
-
-    xTaskCreate(&conectadoWifi,  "Conexão ao MQTT", 4096, NULL, 1, NULL);
-    xTaskCreate(&trataComunicacaoComServidor, "Comunicação com Broker", 4096, NULL, 1, NULL);
-
-
-
     char mensagem[50];
     while (true)
     {
-        float temperature_read = DHT11_read().temperature;
-        float humidity_read = DHT11_read().humidity;
+        float temp_lida = DHT11_read().temperature;
+        float umid_lida = DHT11_read().humidity;
 
-        if (temperature_read != -1 && humidity_read != -1)
+        if (temp_lida != -1 && umid_lida != -1)
         {
-            temperatura = temperature_read;
-            umidade = humidity_read;
+            temperatura = temp_lida;
+            umidade = umid_lida;
         }
 
         printf("Temperatura: %.2f\n", temperatura);
         printf("Umidade: %.2f\n", umidade);
 
+        //sprintf(mensagem, "{\"Temperatura\": %f}", temperatura);
+        //mqtt_envia_mensagem("v1/devices/me/telemetry", mensagem);
+        //grava_valor_nvs("Temperatura", temperatura);
+
+        //sprintf(mensagem, "{\"Umidade\": %f}", umidade);
+        //mqtt_envia_mensagem("v1/devices/me/telemetry", mensagem);
+        //grava_valor_nvs("Umidade", umidade);
 
         vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
