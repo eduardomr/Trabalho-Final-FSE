@@ -20,7 +20,7 @@
 
 #include "dht11.h"
 
-#include "nvs_handler.h"
+//#include "nvs_handler.h"
 
 //temperature function start
 static gpio_num_t dht_gpio = GPIO_NUM_4;
@@ -183,8 +183,7 @@ void app_main(void)
     xTaskCreate(&conectadoWifi,  "Conexão ao MQTT", 4096, NULL, 1, NULL);
     xTaskCreate(&trataComunicacaoComServidor, "Comunicação com Broker", 4096, NULL, 1, NULL);
     
-    while (true)
-    {
-        dht11_run()
-    }
+    
+        dht11_run();
+        
 }

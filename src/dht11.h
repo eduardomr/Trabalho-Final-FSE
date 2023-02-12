@@ -43,5 +43,6 @@ struct dht11_reading
 
 struct dht11_reading DHT11_read();
 void DHT11_routine();
+void dht11_run();
 
 #endif

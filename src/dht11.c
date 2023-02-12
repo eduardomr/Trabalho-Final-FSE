@@ -31,7 +31,7 @@
 
 #include "dht11.h"
 
-#include "nvs_handler.h"
+//#include "nvs_handler.h"
 
 static gpio_num_t dht_gpio = GPIO_NUM_4;
 static int64_t last_read_time = -2000000;
@@ -166,11 +166,11 @@ void dht11_run()
         printf("Temperatura: %.2f\n", temperatura);
         printf("Umidade: %.2f\n", umidade);
 
-        //sprintf(mensagem, "{\"Temperatura\": %f}", temperatura);
+        sprintf(mensagem, "{\"Temperatura\": %f}", temperatura);
         //mqtt_envia_mensagem("v1/devices/me/telemetry", mensagem);
         //grava_valor_nvs("Temperatura", temperatura);
 
-        //sprintf(mensagem, "{\"Umidade\": %f}", umidade);
+        sprintf(mensagem, "{\"Umidade\": %f}", umidade);
         //mqtt_envia_mensagem("v1/devices/me/telemetry", mensagem);
         //grava_valor_nvs("Umidade", umidade);
 
