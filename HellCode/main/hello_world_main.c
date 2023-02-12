@@ -17,7 +17,7 @@
 #define JOYSTICK_X ADC1_CHANNEL_7
 #define JOYSTICK_Y ADC1_CHANNEL_6
 #define JOYSTICK_BOTAO 0
-#define MASSIVE_LAZER 13
+#define MASSIVE_LAZER 16
 
 QueueHandle_t filaDeInterrupcoes;
 SemaphoreHandle_t conexaoWifiSemaphore;
@@ -25,6 +25,9 @@ SemaphoreHandle_t conexaoMQTTSemaphore;
 
 void setup_gpio(){
   esp_rom_gpio_pad_select_gpio(JOYSTICK_BOTAO);
+  gpio_pulldown_en(JOYSTICK_BOTAO);
+  gpio_pullup_dis(JOYSTICK_BOTAO);
+  gpio_set_intr_type(JOYSTICK_BOTAO, GPIO_INTR_POSEDGE);
   gpio_set_direction(JOYSTICK_BOTAO, GPIO_MODE_INPUT);
   gpio_set_direction(MASSIVE_LAZER, GPIO_MODE_OUTPUT);
 
@@ -88,7 +91,7 @@ void trataComunicacaoComServidor(void * params)
 
        /* sprintf(JsonAtributos, "{\"quantidade de pinos\": 5,\n\"umidade\":  20}");
        mqtt_envia_mensagem("v1/devices/me/attributes", JsonAtributos); */
-       vTaskDelay(100 / portTICK_PERIOD_MS);
+       vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
   }
 }
@@ -142,12 +145,12 @@ void app_main()
   filaDeInterrupcoes = xQueueCreate(10, sizeof(int));
   wifi_start();
 
-  gpio_install_isr_service(0);
-  gpio_isr_handler_add(JOYSTICK_BOTAO, gpio_isr_handler,(void*) JOYSTICK_BOTAO);
-
   xTaskCreate(conectadoWifi, "conectadoWifi", 2048, NULL, 5, NULL);
   xTaskCreate(trataInterrupcaoBotao, "trataInterrupcaoBotao", 2048, NULL, 5, NULL);
-  xTaskCreate(&trataComunicacaoComServidor, "Comunicacao com Broker", 4096, NULL, 5, NULL);
+  xTaskCreate(&trataComunicacaoComServidor, "Comunicacao com Broker", 4096, NULL, 1, NULL);
+
+  gpio_install_isr_service(0);
+  gpio_isr_handler_add(JOYSTICK_BOTAO, gpio_isr_handler,(void*) JOYSTICK_BOTAO);
 
 }
 
