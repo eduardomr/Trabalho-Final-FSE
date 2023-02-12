@@ -1,2 +1,2 @@
-idf_component_register(SRCS "wifi.c" "mqtt.c" "gpio_setup.c" "adc_module.c" "hello_world_main.c"
+idf_component_register(SRCS "Joystick.c" "main.c" "wifi.c" "mqtt.c" "gpio_setup.c" "adc_module.c"
                     INCLUDE_DIRS "")
