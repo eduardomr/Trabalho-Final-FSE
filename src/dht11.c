@@ -167,12 +167,7 @@ void dht11_run()
         printf("Umidade: %.2f\n", umidade);
 
         sprintf(mensagem, "{\"Temperatura\": %f}", temperatura);
-        //mqtt_envia_mensagem("v1/devices/me/telemetry", mensagem);
-        //grava_valor_nvs("Temperatura", temperatura);
-
         sprintf(mensagem, "{\"Umidade\": %f}", umidade);
-        //mqtt_envia_mensagem("v1/devices/me/telemetry", mensagem);
-        //grava_valor_nvs("Umidade", umidade);
 
         vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
