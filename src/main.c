@@ -12,7 +12,7 @@
 #include "buzzer.h"
 #include "wifi.h"
 #include "mqtt.h"
-#include "encoderRotativo.h"
+#include "dht11.h"
 
 SemaphoreHandle_t conexaoWifiSemaphore;
 SemaphoreHandle_t conexaoMQTTSemaphore;
@@ -23,30 +23,26 @@ QueueHandle_t filaDeInterrupcoes;
 #define BUZZER 15
 #define TEMP_CRIT 28.0
 
+int estado = 0;
+
 void setup_gpio()
 {
-    esp_rom_gpio_pad_select_gpio(LED_ESP);
-    gpio_set_direction(LED_ESP, GPIO_MODE_OUTPUT);
-    esp_rom_gpio_pad_select_gpio(BOTAO);
-    gpio_pulldown_en(BOTAO);
-    gpio_pullup_dis(BOTAO);
-    gpio_set_intr_type(BOTAO, GPIO_INTR_POSEDGE);
-    gpio_set_direction(BOTAO, GPIO_MODE_INPUT);
-    esp_rom_gpio_pad_select_gpio(BUZZER);
-    gpio_set_direction(BUZZER, GPIO_MODE_OUTPUT);
+  esp_rom_gpio_pad_select_gpio(LED_ESP);
+  gpio_set_direction(LED_ESP, GPIO_MODE_OUTPUT);
+  esp_rom_gpio_pad_select_gpio(BOTAO);
+  gpio_pulldown_en(BOTAO);
+  gpio_pullup_dis(BOTAO);
+  gpio_set_intr_type(BOTAO, GPIO_INTR_POSEDGE);
+  gpio_set_direction(BOTAO, GPIO_MODE_INPUT);
+  esp_rom_gpio_pad_select_gpio(BUZZER);
+  gpio_set_direction(BUZZER, GPIO_MODE_OUTPUT);
 }
 
-
-
-
-
-
-
-void conectadoWifi(void * params)
+void conectadoWifi(void *params)
 {
-  while(true)
+  while (true)
   {
-    if(xSemaphoreTake(conexaoWifiSemaphore, portMAX_DELAY))
+    if (xSemaphoreTake(conexaoWifiSemaphore, portMAX_DELAY))
     {
       // Processamento Internet
       mqtt_start();
@@ -54,60 +50,71 @@ void conectadoWifi(void * params)
   }
 }
 
-void trataComunicacaoComServidor(void * params)
+void trataComunicacaoComServidor(void *params)
 {
   char mensagem[50];
   char JsonAtributos[200];
-  if(xSemaphoreTake(conexaoMQTTSemaphore, portMAX_DELAY))
+  if (xSemaphoreTake(conexaoMQTTSemaphore, portMAX_DELAY))
   {
-    while(true)
+    while (true)
     {
-       float temperatura = 20.0 + (float)rand()/(float)(RAND_MAX/10.0);
-       if (temperatura >= TEMP_CRIT)
-       {
-         // liga_buzzer(BUZZER);
-        sprintf(JsonAtributos, "{\"crit_temp\": true}");
-        mqtt_envia_mensagem("v1/devices/me/attributes", JsonAtributos);
 
-       }
-       else
-       {
-        // desliga_buzzer(BUZZER);
+      if (estado == 1)
+      {
+
+        float temperatura = dht_11_get_temperatura();
+        printf("Temperatura: %f\n", temperatura);
+        if (temperatura >= TEMP_CRIT)
+        {
+          liga_buzzer(BUZZER);
+          sprintf(JsonAtributos, "{\"crit_temp\": true}");
+          mqtt_envia_mensagem("v1/devices/me/attributes", JsonAtributos);
+        }
+        else
+        {
+          desliga_buzzer(BUZZER);
+          sprintf(JsonAtributos, "{\"crit_temp\": false}");
+          mqtt_envia_mensagem("v1/devices/me/attributes", JsonAtributos);
+        }
+
+        if (temperatura != -1)
+        {
+          sprintf(mensagem, "{\"temperatura\": %.2f}", temperatura);
+          mqtt_envia_mensagem("v1/devices/me/telemetry", mensagem);
+        }
+        /* sprintf(JsonAtributos, "{\"quantidade de pinos\": 5,\n\"umidade\":  20}");
+        mqtt_envia_mensagem("v1/devices/me/attributes", JsonAtributos); */
+        vTaskDelay(3000 / portTICK_PERIOD_MS);
+      }
+      if (estado == 0){
+        desliga_buzzer(BUZZER);
         sprintf(JsonAtributos, "{\"crit_temp\": false}");
         mqtt_envia_mensagem("v1/devices/me/attributes", JsonAtributos);
-       }
-       sprintf(mensagem, "{\"temperatura\": %f}", temperatura);
-       mqtt_envia_mensagem("v1/devices/me/telemetry", mensagem);
-
-       /* sprintf(JsonAtributos, "{\"quantidade de pinos\": 5,\n\"umidade\":  20}");
-       mqtt_envia_mensagem("v1/devices/me/attributes", JsonAtributos); */
-       vTaskDelay(3000 / portTICK_PERIOD_MS);
+        vTaskDelay(3000 / portTICK_PERIOD_MS);
+      }
     }
   }
 }
 
-
-static void IRAM_ATTR gpio_isr_handler(void* args)
+static void IRAM_ATTR gpio_isr_handler(void *args)
 {
-  int pino = (int) args;
+  int pino = (int)args;
   xQueueSendFromISR(filaDeInterrupcoes, &pino, NULL);
 }
 
-void trataInterrupcaoBotao(void * params)
+void trataInterrupcaoBotao(void *params)
 {
   int pino;
   char JsonAtributos[200];
-  int estado = 0;
 
-
-  while(true)
+  while (true)
   {
-   if(xQueueReceive(filaDeInterrupcoes, &pino, portMAX_DELAY))
-   {
-    
+    if (xQueueReceive(filaDeInterrupcoes, &pino, portMAX_DELAY))
+    {
+
       if (estado == 0)
       {
-        
+
         printf("LIGOU O SISTEMA\n");
         gpio_set_level(LED_ESP, 1);
         sprintf(JsonAtributos, "{\"estado_sistema\": true}");
@@ -123,26 +130,23 @@ void trataInterrupcaoBotao(void * params)
         estado = 0;
       }
     }
-   }
-  
+  }
 }
 void app_main(void)
 {
-  
 
   nvs_flash_init();
   setup_gpio();
-  
+
   conexaoWifiSemaphore = xSemaphoreCreateBinary();
   conexaoMQTTSemaphore = xSemaphoreCreateBinary();
   filaDeInterrupcoes = xQueueCreate(10, sizeof(int));
   wifi_start();
-  
-  
+
   xTaskCreate(conectadoWifi, "conectadoWifi", 2048, NULL, 5, NULL);
   xTaskCreate(trataInterrupcaoBotao, "trataInterrupcaoBotao", 2048, NULL, 5, NULL);
   xTaskCreate(&trataComunicacaoComServidor, "Comunicação com Broker", 4096, NULL, 1, NULL);
 
   gpio_install_isr_service(0);
-  gpio_isr_handler_add(BOTAO, gpio_isr_handler,(void*) BOTAO);
+  gpio_isr_handler_add(BOTAO, gpio_isr_handler, (void *)BOTAO);
 }
