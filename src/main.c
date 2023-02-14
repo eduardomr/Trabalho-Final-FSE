@@ -21,7 +21,7 @@ QueueHandle_t filaDeInterrupcoes;
 #define BOTAO 0
 #define LED_ESP 2
 #define BUZZER 15
-#define TEMP_CRIT 28.0
+#define TEMP_CRIT 25.5
 
 int estado = 0;
 
