@@ -17,7 +17,7 @@ Este projeto tem por objetivo simular uma máquina CNC, para corte e gravação 
 #### Dispositivo 1 (ESP32)
 |  |   |
 | :-: | :- |
-| DHT11 | Temperatura e Umidade |
+| DHT11 | Temperatura |
 | Passive Buzzer  | Alarme sonoro |
 
 #### Dispositivo 2 (ESP32)
