@@ -5,7 +5,7 @@
 
 | Nome | Matrícula  |
 | :- | :- |
-| Daniela Soares | --------- |
+| Daniela Soares | 180015222 |
 | Eduardo Maia Rezende  | 180119231 |
 | Helder Lourenço de Abreu Marques | 180121847 |
 
